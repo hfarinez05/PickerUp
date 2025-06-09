@@ -1,4 +1,4 @@
-let pedidos = [];
+let pedidos = JSON.parse(localStorage.getItem("pedidos")) || [];
 
 function obtenerPiqueoUnitario(skus) {
   if (skus >= 1 && skus <= 10) return 120;
@@ -46,7 +46,7 @@ function agregarPedido() {
 
   pedidos.push(nuevoPedido);
   //console.log("Pedidos actuales:", pedidos);
-
+  localStorage.setItem("pedidos", JSON.stringify(pedidos));
   actualizarTabla();
 }
 
@@ -62,7 +62,7 @@ function actualizarTabla() {
     pedidosPorFecha[pedido.fecha].push({ ...pedido, index });
   });
 
-  console.log("Pedidos agrupados por fecha:", pedidosPorFecha);
+  //console.log("Pedidos agrupados por fecha:", pedidosPorFecha);
 
   let totalGeneral = 0;
 
@@ -100,13 +100,22 @@ function actualizarTabla() {
     totalGeneral += subTotal;
   }
   // mostrar general
-
   document.getElementById("total-dia").textContent = totalGeneral;
 }
 
 function eliminarPedido(id) {
-  console.log("Eliminando el pedido con id:", id);
   pedidos = pedidos.filter((p) => p.id !== id);
-  console.log("Pedidos después de eliminar:", pedidos);
+  localStorage.setItem("pedidos", JSON.stringify(pedidos));
   actualizarTabla();
 }
+
+function cargarDatosIniciales() {
+  const datosGuardados = JSON.parse(localStorage.getItem("pedidos")) || [];
+  if (datosGuardados.length > 0) {
+    pedidos = datosGuardados;
+    actualizarTabla();
+  }
+}
+
+// Llamar la función al cargar la página
+document.addEventListener("DOMContentLoaded", cargarDatosIniciales);
