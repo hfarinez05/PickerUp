@@ -28,11 +28,9 @@ button:hover {
 
 table {
   margin-top: 20px;
+  width: 100%;
   border-collapse: collapse;
   background-color: white;
-  display: inline-table;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 th,
@@ -52,10 +50,16 @@ td {
   background-color: transparent;
   border: none;
   color: red;
-  font-size: 18px;
+  font-size: 14px;
+  width: 30px;
+  padding: 0;
   cursor: pointer;
 }
 
 .eliminar:hover {
   transform: scale(1.2);
+}
+
+.input-pequeno {
+  width: 80px;
 }
