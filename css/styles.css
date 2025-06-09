@@ -63,3 +63,84 @@ td {
 .input-pequeno {
   width: 80px;
 }
+
+.col-sku {
+  width: 60px;
+  max-width: 60px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.col-eliminar {
+  width: 40px;
+  max-width: 40px;
+  padding: 0;
+}
+
+@media screen and (max-width: 768px) {
+  thead {
+    display: none;
+  }
+
+  tr.mobile-row {
+    display: block;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    padding: 10px;
+    background-color: white;
+    border-radius: 8px;
+  }
+
+  tr.mobile-row td {
+    display: block;
+    position: relative;
+    padding-left: 50%;
+    text-align: left;
+    border: none;
+    border-bottom: 1px solid #eee;
+  }
+
+  tr.mobile-row td::before {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    width: 45%;
+    white-space: nowrap;
+    font-weight: bold;
+    color: #555;
+  }
+
+  tr.mobile-row td:nth-of-type(1)::before {
+    content: "Fecha";
+  }
+  tr.mobile-row td:nth-of-type(2)::before {
+    content: "SKU'S";
+  }
+  tr.mobile-row td:nth-of-type(3)::before {
+    content: "PIQUEO";
+  }
+  tr.mobile-row td:nth-of-type(4)::before {
+    content: "BASE";
+  }
+  tr.mobile-row td:nth-of-type(5)::before {
+    content: "TOTAL";
+  }
+  tr.mobile-row td:nth-of-type(6)::before {
+    content: "Eliminar";
+  }
+
+  /* Fila subtotal (no se ve afectada) */
+  tr.subtotal {
+    display: table;
+    width: 100%;
+  }
+
+  tr.subtotal td {
+    display: table-cell;
+    text-align: right;
+    background-color: #ddd;
+    font-weight: bold;
+    padding: 10px;
+    border: 1px solid #ccc;
+  }
+}

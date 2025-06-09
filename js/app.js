@@ -72,7 +72,7 @@ function actualizarTabla() {
     //encabezado de dia
 
     const encabezado = document.createElement("tr");
-    encabezado.innerHTML = `<td colspan="6" style="background-color: #eee; font-weight: bold;">${fecha}</td`;
+    encabezado.innerHTML = `<td colspan="6" style="background-color: #eee; font-weight: bold;">${fecha}</td>`;
     tabla.appendChild(encabezado);
 
     let subTotal = 0;
@@ -93,7 +93,8 @@ function actualizarTabla() {
     const filaSubTotal = document.createElement("tr");
     filaSubTotal.innerHTML = `
   <td colspan="4" style="text-align:right;"><strong>Subtotal del dia: </strong></td>
-  <td colspan="2"><strong>$${subTotal}</strong></td>;`;
+  <td colspan="2"><strong>$${subTotal}</strong></td>`;
+    filaSubTotal.classList.add("subTotal");
     tabla.appendChild(filaSubTotal);
 
     totalGeneral += subTotal;
