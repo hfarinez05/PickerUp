@@ -1,4 +1,3 @@
-//let pedidos = JSON.parse(localStorage.getItem("pedidos")) || [];
 let pedidos = [];
 try {
   const datosGuardados = JSON.parse(localStorage.getItem("pedidos"));
@@ -37,13 +36,6 @@ function agregarPedido() {
   const base = calcularBase(skus);
   const total = piqueoTotal + base;
 
-  /* console.log("Fecha:", fecha);
-  console.log("SKUs:", skus);
-  console.log("Piqueo Unitario:", piqueoUnitario);
-  console.log("Piqueo Total:", piqueoTotal);
-  console.log("Base:", base);
-  console.log("Total del Pedido:", total); */
-
   const nuevoPedido = {
     id: Date.now(),
     fecha,
@@ -55,7 +47,6 @@ function agregarPedido() {
   };
 
   pedidos.push(nuevoPedido);
-  //console.log("Pedidos actuales:", pedidos);
   localStorage.setItem("pedidos", JSON.stringify(pedidos));
   actualizarTabla();
 }
@@ -63,7 +54,6 @@ function agregarPedido() {
 function actualizarTabla() {
   const tabla = document.getElementById("tabla-pedidos");
   tabla.innerHTML = "";
-
   pedidos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   // Paso 1: Agrupar pedidos por fecha
@@ -76,13 +66,12 @@ function actualizarTabla() {
   });
 
   // Paso 2: Obtener fecha de hoy
-  const hoy = new Date().toISOString().split("T")[0];
+  //const hoy = new Date().toISOString().split("T")[0];
   // Paso 3: Sacar las fechas agrupadas Y ordenarlas
   const fechasOrdenadas = Object.keys(pedidosPorFecha);
 
   // Paso 4: Usar esas fechas para recorrer y mostrar los pedidos
   let totalGeneral = 0;
-
   for (const fecha of fechasOrdenadas) {
     const grupo = pedidosPorFecha[fecha];
 
@@ -107,17 +96,36 @@ function actualizarTabla() {
         subTotal += p.total;
       });
 
+    // Cantidad de pedidos del día
+    /* const filaCantidad = document.createElement("tr");
+    filaCantidad.innerHTML = `
+      <td colspan="6" style="text-align:right; font-style: italic;">Pedidos del día: ${grupo.length}</td>`;
+    tabla.appendChild(filaCantidad);
+
+    // Subtotal del día
     const filaSubTotal = document.createElement("tr");
     filaSubTotal.innerHTML = `
   <td colspan="4" style="text-align:right;"><strong>Subtotal del dia: </strong></td>
   <td colspan="2"><strong>$${subTotal}</strong></td>`;
     filaSubTotal.classList.add("subTotal");
-    tabla.appendChild(filaSubTotal);
+    tabla.appendChild(filaSubTotal); */
+
+    const filaResumen = document.createElement("tr");
+    filaResumen.innerHTML = `
+  <td colspan="3" style="text-align:left; font-style: italic;">Pedidos del día: ${grupo.length}</td>
+  <td colspan="3" style="text-align:right;"><strong>Subtotal del día:</strong> $${subTotal}</td>`;
+    tabla.appendChild(filaResumen);
 
     totalGeneral += subTotal;
   }
-  // mostrar general
+  // mostrar general de dinero
   document.getElementById("total-dia").textContent = totalGeneral;
+
+  // Mostrar cantidad total de pedidos
+  const cantidadPedidosEl = document.getElementById("cantidad-pedidos");
+  if (cantidadPedidosEl) {
+    cantidadPedidosEl.textContent = pedidos.length;
+  }
 }
 
 function eliminarPedido(id) {
@@ -125,14 +133,6 @@ function eliminarPedido(id) {
   localStorage.setItem("pedidos", JSON.stringify(pedidos));
   actualizarTabla();
 }
-
-/* function cargarDatosIniciales() {
-  const datosGuardados = JSON.parse(localStorage.getItem("pedidos")) || [];
-  if (datosGuardados.length > 0) {
-    pedidos = datosGuardados;
-    actualizarTabla();
-  }
-} */
 
 function cargarDatosIniciales() {
   actualizarTabla();
