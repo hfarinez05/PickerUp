@@ -151,3 +151,18 @@ td {
     border: 1px solid #ccc;
   }
 }
+
+.feedback-emoji {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  font-size: 50px;
+  opacity: 0;
+  transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+  z-index: 999;
+}
+
+.feedback-emoji.mostrar {
+  opacity: 1;
+  transform: scale(1.2);
+}

@@ -35,6 +35,7 @@ function agregarPedido() {
   const piqueoTotal = piqueoUnitario * skus;
   const base = calcularBase(skus);
   const total = piqueoTotal + base;
+  mostrarFeedback(skus);
 
   const nuevoPedido = {
     id: Date.now(),
@@ -148,6 +149,23 @@ function eliminarTodosLosPedidos() {
   pedidos = [];
   localStorage.removeItem("pedidos");
   actualizarTabla();
+}
+function mostrarFeedback(skus) {
+  const feedback = document.getElementById("feedback");
+  if (skus === 9 || skus === 10) {
+    feedback.textContent = "😊";
+  } else if (skus > 25) {
+    feedback.textContent = "😟";
+  } else {
+    feedback.textContent = "";
+    return;
+  }
+
+  feedback.classList.add("mostrar");
+
+  setTimeout(() => {
+    feedback.classList.remove("mostrar");
+  }, 2000); // se oculta luego de 2 segundos
 }
 
 // Llamar la función al cargar la página
