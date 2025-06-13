@@ -136,6 +136,18 @@ function eliminarPedido(id) {
 
 function cargarDatosIniciales() {
   actualizarTabla();
+
+  const iconoPapelera = document.getElementById("iconoPapelera");
+  iconoPapelera.addEventListener("click", () => {
+    if (confirm("¿Estás seguro que quieres eliminar todos los pedidos?")) {
+      eliminarTodosLosPedidos();
+    }
+  });
+}
+function eliminarTodosLosPedidos() {
+  pedidos = [];
+  localStorage.removeItem("pedidos");
+  actualizarTabla();
 }
 
 // Llamar la función al cargar la página
