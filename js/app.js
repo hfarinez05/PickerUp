@@ -23,7 +23,7 @@ function calcularBase(skus) {
 
 function agregarPedido() {
   const fecha = document.getElementById("Fecha").value;
-  console.log("Fecha capturada:", fecha);
+
   const skus = parseInt(document.getElementById("skus").value);
 
   if (!fecha || isNaN(skus) || skus < 1) {
