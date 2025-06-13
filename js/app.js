@@ -1,4 +1,13 @@
-let pedidos = JSON.parse(localStorage.getItem("pedidos")) || [];
+//let pedidos = JSON.parse(localStorage.getItem("pedidos")) || [];
+let pedidos = [];
+try {
+  const datosGuardados = JSON.parse(localStorage.getItem("pedidos"));
+  if (Array.isArray(datosGuardados)) {
+    pedidos = datosGuardados;
+  }
+} catch (error) {
+  console.error("Error al cargar datos:", error);
+}
 
 function obtenerPiqueoUnitario(skus) {
   if (skus >= 1 && skus <= 10) return 120;
@@ -15,6 +24,7 @@ function calcularBase(skus) {
 
 function agregarPedido() {
   const fecha = document.getElementById("Fecha").value;
+  console.log("Fecha capturada:", fecha);
   const skus = parseInt(document.getElementById("skus").value);
 
   if (!fecha || isNaN(skus) || skus < 1) {
@@ -54,6 +64,9 @@ function actualizarTabla() {
   const tabla = document.getElementById("tabla-pedidos");
   tabla.innerHTML = "";
 
+  pedidos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+
+  // Paso 1: Agrupar pedidos por fecha
   const pedidosPorFecha = {};
   pedidos.forEach((pedido, index) => {
     if (!pedidosPorFecha[pedido.fecha]) {
@@ -62,14 +75,16 @@ function actualizarTabla() {
     pedidosPorFecha[pedido.fecha].push({ ...pedido, index });
   });
 
-  //console.log("Pedidos agrupados por fecha:", pedidosPorFecha);
+  // Paso 2: Obtener fecha de hoy
+  const hoy = new Date().toISOString().split("T")[0];
+  // Paso 3: Sacar las fechas agrupadas Y ordenarlas
+  const fechasOrdenadas = Object.keys(pedidosPorFecha);
 
+  // Paso 4: Usar esas fechas para recorrer y mostrar los pedidos
   let totalGeneral = 0;
 
-  for (const fecha in pedidosPorFecha) {
+  for (const fecha of fechasOrdenadas) {
     const grupo = pedidosPorFecha[fecha];
-
-    //encabezado de dia
 
     const encabezado = document.createElement("tr");
     encabezado.innerHTML = `<td colspan="6" style="background-color: #eee; font-weight: bold;">${fecha}</td>`;
@@ -109,12 +124,16 @@ function eliminarPedido(id) {
   actualizarTabla();
 }
 
-function cargarDatosIniciales() {
+/* function cargarDatosIniciales() {
   const datosGuardados = JSON.parse(localStorage.getItem("pedidos")) || [];
   if (datosGuardados.length > 0) {
     pedidos = datosGuardados;
     actualizarTabla();
   }
+} */
+
+function cargarDatosIniciales() {
+  actualizarTabla();
 }
 
 // Llamar la función al cargar la página
