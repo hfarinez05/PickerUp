@@ -92,18 +92,20 @@ function actualizarTabla() {
 
     let subTotal = 0;
 
-    grupo.forEach((p) => {
-      const fila = document.createElement("tr");
-      fila.innerHTML = `
+    grupo
+      .sort((a, b) => b.id - a.id)
+      .forEach((p) => {
+        const fila = document.createElement("tr");
+        fila.innerHTML = `
     <td>${p.fecha}</td>
     <td>${p.skus}</td>
     <td>${p.piqueoTotal}<br><small>(${p.piqueoUnitario}x${p.skus})</small></td>
     <td>${p.base}</td>
     <td>${p.total}</td>
     <td><button class="eliminar" onclick="eliminarPedido(${p.id})">X</button> </td>`;
-      tabla.appendChild(fila);
-      subTotal += p.total;
-    });
+        tabla.appendChild(fila);
+        subTotal += p.total;
+      });
 
     const filaSubTotal = document.createElement("tr");
     filaSubTotal.innerHTML = `
