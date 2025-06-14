@@ -41,9 +41,16 @@ td {
 }
 .total-dia {
   font-weight: bold;
-  font-size: 18px;
+  font-size: 16px;
   margin-top: 20px;
-  color: #222;
+  color: #444;
+}
+
+.total-descuento {
+  font-weight: bold;
+  font-size: 16px;
+  margin-top: 5px;
+  color: #444;
 }
 
 .cantidad-pedidos {

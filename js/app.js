@@ -121,6 +121,10 @@ function actualizarTabla() {
   }
   // mostrar general de dinero
   document.getElementById("total-dia").textContent = totalGeneral;
+  const descuento = totalGeneral * 0.181;
+  const totalConDescuento = totalGeneral - descuento;
+  document.getElementById("total-con-descuento").textContent =
+    totalConDescuento.toFixed(2);
 
   // Mostrar cantidad total de pedidos
   const cantidadPedidosEl = document.getElementById("cantidad-pedidos");
