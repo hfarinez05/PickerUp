@@ -166,3 +166,12 @@ td {
   opacity: 1;
   transform: scale(1.2);
 }
+
+@media screen and (max-width: 768px) {
+  .feedback-emoji {
+    top: 40%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 80px;
+  }
+}
