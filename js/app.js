@@ -39,6 +39,8 @@ function agregarPedido() {
 
   // 📊 Evento Google Analytics: pedido agregado
   if (typeof gtag === "function") {
+    console.log("📊 Evento agregar_pedido disparado", { skus, total });
+
     gtag("event", "agregar_pedido", {
       skus: skus,
       total: total,
