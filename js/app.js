@@ -37,6 +37,14 @@ function agregarPedido() {
   const total = piqueoTotal + base;
   mostrarFeedback(skus);
 
+  // 📊 Evento Google Analytics: pedido agregado
+  if (typeof gtag === "function") {
+    gtag("event", "agregar_pedido", {
+      skus: skus,
+      total: total,
+    });
+  }
+
   const nuevoPedido = {
     id: Date.now(),
     fecha,
