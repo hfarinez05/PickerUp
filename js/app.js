@@ -37,14 +37,26 @@ function agregarPedido() {
   const total = piqueoTotal + base;
   mostrarFeedback(skus);
 
-  // 📊 Evento Google Analytics: pedido agregado
   if (typeof gtag === "function") {
-    console.log("📊 Evento agregar_pedido disparado", { skus, total });
-
-    gtag("event", "agregar_pedido", {
-      skus: skus,
-      total: total,
+    gtag("event", "add_to_cart", {
+      currency: "USD",
+      value: total,
+      items: [
+        {
+          item_name: "Pedido",
+          quantity: skus,
+          price: piqueoUnitario,
+        },
+      ],
     });
+
+    // 📊 Evento Google Analytics: pedido agregado
+    //if (typeof gtag === "function") {
+    //console.log("📊 Evento agregar_pedido disparado", { skus, total });
+    // gtag("event", "agregar_pedido", {
+    //   skus: skus,
+    //   total: total,
+    // });
   }
 
   const nuevoPedido = {
