@@ -68,8 +68,8 @@ async function agregarPedido() {
   const base = calcularBase(skus);
   const total = piqueoTotal + base;
 
-  await addDoc(collection(db, "pedidos"), {
-    uid: user.uid,
+  // ✅ Guardar en subcolección del usuario
+  await addDoc(collection(db, "usuarios", user.uid, "pedidos"), {
     fecha,
     skus,
     piqueoUnitario,
@@ -86,9 +86,10 @@ async function agregarPedido() {
 
 async function cargarPedidos() {
   const user = auth.currentUser;
-  if (!user) return; // 🔥 evita error
-  const q = query(collection(db, "pedidos"), where("uid", "==", user.uid));
+  if (!user) return;
 
+  // ✅ Leer desde la subcolección del usuario
+  const q = query(collection(db, "usuarios", user.uid, "pedidos"));
   const snapshot = await getDocs(q);
 
   pedidos = snapshot.docs.map((doc) => ({
@@ -164,7 +165,10 @@ function actualizarTabla() {
 }
 
 async function eliminarPedido(id) {
-  await deleteDoc(doc(db, "pedidos", id));
+  const user = auth.currentUser;
+  if (!user) return;
+
+  await deleteDoc(doc(db, "usuarios", user.uid, "pedidos", id));
   cargarPedidos();
 }
 
@@ -173,13 +177,12 @@ async function eliminarTodosLosPedidos() {
   if (!confirmacion) return;
 
   const user = auth.currentUser;
-
   if (!user) {
     alert("No hay usuario logueado");
     return;
   }
 
-  const q = query(collection(db, "pedidos"), where("uid", "==", user.uid));
+  const q = query(collection(db, "usuarios", user.uid, "pedidos"));
   const snapshot = await getDocs(q);
 
   if (snapshot.empty) {
@@ -188,13 +191,12 @@ async function eliminarTodosLosPedidos() {
   }
 
   const eliminaciones = snapshot.docs.map((docu) =>
-    deleteDoc(doc(db, "pedidos", docu.id)),
+    deleteDoc(doc(db, "usuarios", user.uid, "pedidos", docu.id)),
   );
 
   await Promise.all(eliminaciones);
 
   alert("Todos los pedidos eliminados");
-
   cargarPedidos();
 }
 
