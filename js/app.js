@@ -10,6 +10,7 @@ import {
   getDocs,
   getDoc,
   deleteDoc,
+  setDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   createUserWithEmailAndPassword,
@@ -22,7 +23,16 @@ function registrar() {
   const password = document.getElementById("password").value;
 
   createUserWithEmailAndPassword(auth, email, password)
-    .then(() => alert("Usuario registrado"))
+    .then(async (userCredential) => {
+      const user = userCredential.user;
+
+      // 👇 Inicializa documento en Firestore con activo:false
+      await setDoc(doc(db, "usuarios", user.uid), {
+        activo: false,
+      });
+
+      alert("Usuario registrado. Debe ser habilitado por el administrador.");
+    })
     .catch((e) => {
       console.error("Error en registro:", e.code, e.message);
       alert(e.message);
