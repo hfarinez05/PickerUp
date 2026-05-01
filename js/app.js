@@ -19,25 +19,65 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 function registrar() {
+  console.log("👉 INICIANDO REGISTRO");
+
   const email = document.getElementById("email").value;
   const password = document.getElementById("password").value;
 
+  console.log("📧 EMAIL:", email);
+  console.log("🔑 PASSWORD LENGTH:", password?.length);
+
   createUserWithEmailAndPassword(auth, email, password)
     .then(async (userCredential) => {
+      console.log("✔ AUTH OK");
+
       const user = userCredential.user;
 
-      // 👇 Inicializa documento en Firestore con activo:false
-      await setDoc(doc(db, "usuarios", user.uid), {
-        activo: false,
-        email: user.email.toLowerCase().trim(),
-      });
+      console.log("🧾 USER CREADO:");
+      console.log(user);
 
-      alert("Usuario registrado. Debe ser habilitado por el administrador.");
+      console.log("🆔 UID:", user.uid);
+      console.log("📧 USER EMAIL:", user.email);
+
+      try {
+        console.log("👉 ANTES DE FIRESTORE (setDoc)");
+
+        const data = {
+          activo: false,
+          email: user.email.toLowerCase().trim(),
+        };
+
+        console.log("📦 DATA A GUARDAR:", data);
+        console.log("🔥 EJECUTANDO setDoc...");
+
+        await setDoc(doc(db, "usuarios", user.uid), data);
+
+        console.log("✔ FIRESTORE OK");
+        console.log("🎉 USUARIO COMPLETAMENTE REGISTRADO");
+
+        alert(
+          "Usuario registrado con éxito. Debe ser habilitado por el administrador.",
+        );
+      } catch (error) {
+        console.error("❌ ERROR EN FIRESTORE");
+        console.error("CODE:", error.code);
+        console.error("MESSAGE:", error.message);
+        console.error("FULL ERROR:", error);
+
+        alert("Usuario creado, pero hubo un error guardando datos.");
+      }
+
+      console.log("👉 FIN BLOQUE AUTH SUCCESS");
     })
     .catch((e) => {
-      console.error("Error en registro:", e.code, e.message);
+      console.error("❌ ERROR EN AUTH");
+      console.error("CODE:", e.code);
+      console.error("MESSAGE:", e.message);
+
       alert(e.message);
     });
+
+  console.log("👉 FUNCIÓN REGISTRAR EJECUTADA (FIN SCOPE)");
 }
 
 function login() {
