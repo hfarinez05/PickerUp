@@ -3,7 +3,9 @@ import {
   collection,
   addDoc,
   query,
-  where,
+  orderBy,
+  limit,
+  startAfter,
   getDocs,
   deleteDoc,
   doc,
@@ -33,6 +35,7 @@ function login() {
 }
 
 let pedidos = [];
+let ultimoDoc = null; // 👈 para paginación
 
 function obtenerPiqueoUnitario(skus) {
   if (skus >= 1 && skus <= 10) return 120;
@@ -49,7 +52,6 @@ function calcularBase(skus) {
 
 async function agregarPedido() {
   const user = auth.currentUser;
-
   if (!user) {
     alert("Debes iniciar sesión");
     return;
@@ -68,7 +70,6 @@ async function agregarPedido() {
   const base = calcularBase(skus);
   const total = piqueoTotal + base;
 
-  // ✅ Guardar en subcolección del usuario
   await addDoc(collection(db, "usuarios", user.uid, "pedidos"), {
     fecha,
     skus,
@@ -79,25 +80,59 @@ async function agregarPedido() {
   });
 
   mostrarFeedback(skus);
-  cargarPedidos();
-
+  cargarPedidosIniciales(); // 👈 recarga solo primeros 20
   document.getElementById("skus").value = "";
 }
 
-async function cargarPedidos() {
+// ✅ Cargar primeros 20 pedidos
+async function cargarPedidosIniciales() {
   const user = auth.currentUser;
   if (!user) return;
 
-  // ✅ Leer desde la subcolección del usuario
-  const q = query(collection(db, "usuarios", user.uid, "pedidos"));
-  const snapshot = await getDocs(q);
+  const q = query(
+    collection(db, "usuarios", user.uid, "pedidos"),
+    orderBy("fecha", "desc"),
+    limit(20),
+  );
 
-  pedidos = snapshot.docs.map((doc) => ({
+  const snapshot = await getDocs(q);
+  pedidos = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  actualizarTabla();
+
+  ultimoDoc = snapshot.docs[snapshot.docs.length - 1];
+
+  if (snapshot.docs.length === 20) {
+    document.getElementById("btn-cargar-mas").style.display = "block";
+  } else {
+    document.getElementById("btn-cargar-mas").style.display = "none";
+  }
+}
+
+// ✅ Cargar más pedidos (otros 20)
+async function cargarMasPedidos() {
+  const user = auth.currentUser;
+  if (!user || !ultimoDoc) return;
+
+  const q = query(
+    collection(db, "usuarios", user.uid, "pedidos"),
+    orderBy("fecha", "desc"),
+    startAfter(ultimoDoc),
+    limit(20),
+  );
+
+  const snapshot = await getDocs(q);
+  const nuevosPedidos = snapshot.docs.map((doc) => ({
     id: doc.id,
     ...doc.data(),
   }));
-
+  pedidos = [...pedidos, ...nuevosPedidos];
   actualizarTabla();
+
+  if (snapshot.docs.length > 0) {
+    ultimoDoc = snapshot.docs[snapshot.docs.length - 1];
+  } else {
+    document.getElementById("btn-cargar-mas").style.display = "none";
+  }
 }
 
 function actualizarTabla() {
@@ -105,9 +140,8 @@ function actualizarTabla() {
   tabla.innerHTML = "";
   pedidos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
-  // Paso 1: Agrupar pedidos por fecha
   const pedidosPorFecha = {};
-  pedidos.forEach((pedido, index) => {
+  pedidos.forEach((pedido) => {
     if (!pedidosPorFecha[pedido.fecha]) {
       pedidosPorFecha[pedido.fecha] = [];
     }
@@ -115,61 +149,52 @@ function actualizarTabla() {
   });
 
   const fechasOrdenadas = Object.keys(pedidosPorFecha);
-
-  // Paso 4: Usar esas fechas para recorrer y mostrar los pedidos
   let totalGeneral = 0;
+
   for (const fecha of fechasOrdenadas) {
     const grupo = pedidosPorFecha[fecha];
-
     const encabezado = document.createElement("tr");
     encabezado.innerHTML = `<td colspan="6" style="background-color: #eee; font-weight: bold;">${fecha}</td>`;
     tabla.appendChild(encabezado);
 
     let subTotal = 0;
-
-    grupo
-      //.sort((a, b) => b.id - a.id)
-      .forEach((p) => {
-        const fila = document.createElement("tr");
-        fila.innerHTML = `
-    <td>${p.fecha}</td>
-    <td>${p.skus}</td>
-    <td>${p.piqueoTotal}<br><small>(${p.piqueoUnitario}x${p.skus})</small></td>
-    <td>${p.base}</td>
-    <td>${p.total}</td>
-    <td><button class="eliminar" onclick="eliminarPedido('${p.id}')">X</button> </td>`;
-        tabla.appendChild(fila);
-        subTotal += p.total;
-      });
+    grupo.forEach((p) => {
+      const fila = document.createElement("tr");
+      fila.innerHTML = `
+        <td>${p.fecha}</td>
+        <td>${p.skus}</td>
+        <td>${p.piqueoTotal}<br><small>(${p.piqueoUnitario}x${p.skus})</small></td>
+        <td>${p.base}</td>
+        <td>${p.total}</td>
+        <td><button class="eliminar" onclick="eliminarPedido('${p.id}')">X</button></td>`;
+      tabla.appendChild(fila);
+      subTotal += p.total;
+    });
 
     const filaResumen = document.createElement("tr");
     filaResumen.innerHTML = `
-  <td colspan="3" style="text-align:left; font-style: italic;">Pedidos del día: ${grupo.length}</td>
-  <td colspan="3" style="text-align:right;"><strong>Subtotal del día:</strong> $${subTotal}</td>`;
+      <td colspan="3" style="text-align:left; font-style: italic;">Pedidos del día: ${grupo.length}</td>
+      <td colspan="3" style="text-align:right;"><strong>Subtotal del día:</strong> $${subTotal}</td>`;
     tabla.appendChild(filaResumen);
 
     totalGeneral += subTotal;
   }
-  // mostrar general de dinero
+
   document.getElementById("total-dia").textContent = totalGeneral;
   const descuento = totalGeneral * 0.145;
   const totalConDescuento = totalGeneral - descuento;
   document.getElementById("total-con-descuento").textContent =
     totalConDescuento.toFixed(2);
 
-  // Mostrar cantidad total de pedidos
   const cantidadPedidosEl = document.getElementById("cantidad-pedidos");
-  if (cantidadPedidosEl) {
-    cantidadPedidosEl.textContent = pedidos.length;
-  }
+  if (cantidadPedidosEl) cantidadPedidosEl.textContent = pedidos.length;
 }
 
 async function eliminarPedido(id) {
   const user = auth.currentUser;
   if (!user) return;
-
   await deleteDoc(doc(db, "usuarios", user.uid, "pedidos", id));
-  cargarPedidos();
+  cargarPedidosIniciales();
 }
 
 async function eliminarTodosLosPedidos() {
@@ -195,27 +220,18 @@ async function eliminarTodosLosPedidos() {
   );
 
   await Promise.all(eliminaciones);
-
   alert("Todos los pedidos eliminados");
-  cargarPedidos();
+  cargarPedidosIniciales();
 }
 
 function mostrarFeedback(skus) {
   const feedback = document.getElementById("feedback");
-
-  if (skus <= 10) {
-    feedback.textContent = "😊";
-  } else if (skus <= 25) {
-    feedback.textContent = "😐";
-  } else {
-    feedback.textContent = "😟";
-  }
+  if (skus <= 10) feedback.textContent = "😊";
+  else if (skus <= 25) feedback.textContent = "😐";
+  else feedback.textContent = "😟";
 
   feedback.classList.add("mostrar");
-
-  setTimeout(() => {
-    feedback.classList.remove("mostrar");
-  }, 2000);
+  setTimeout(() => feedback.classList.remove("mostrar"), 2000);
 }
 
 onAuthStateChanged(auth, (user) => {
@@ -223,13 +239,12 @@ onAuthStateChanged(auth, (user) => {
   const authDiv = document.getElementById("auth");
   const loading = document.getElementById("loading");
 
-  // 👇 primero ocultamos loading
   loading.style.display = "none";
 
   if (user) {
     authDiv.style.display = "none";
     app.style.display = "block";
-    cargarPedidos();
+    cargarPedidosIniciales(); // 👈 ahora carga solo 20
   } else {
     authDiv.style.display = "block";
     app.style.display = "none";
@@ -246,3 +261,4 @@ window.logout = logout;
 window.agregarPedido = agregarPedido;
 window.eliminarPedido = eliminarPedido;
 window.eliminarTodosLosPedidos = eliminarTodosLosPedidos;
+window.cargarMasPedidos = cargarMasPedidos;

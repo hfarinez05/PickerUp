@@ -7,7 +7,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBXEU8zfJIB0M8Yo52kiGvw37-d6YfKbpM",
   authDomain: "pickerup-1d550.firebaseapp.com",
   projectId: "pickerup-1d550",
-  storageBucket: "pickerup-1d550.firebasestorage.app",
+  storageBucket: "pickerup-1d550.appspot.com",
   messagingSenderId: "531666332170",
   appId: "1:531666332170:web:3fd474199eaf0fa60b0df3",
   measurementId: "G-520P37EVFW",
