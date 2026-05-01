@@ -16,7 +16,6 @@
         dataLayer.push(arguments);
       }
       gtag("js", new Date());
-
       gtag("config", "G-299MWDD9Y5");
     </script>
   </head>
@@ -29,6 +28,24 @@
       <button onclick="login()">Ingresar</button>
     </div>
 
+    <!-- 🚨 Banner fijo de aviso (fuera de #app) -->
+    <div
+      id="banner-alert"
+      style="
+        display: none;
+        background-color: #ffdddd;
+        color: #a33;
+        padding: 10px;
+        text-align: center;
+        font-weight: bold;
+        border: 1px solid #a33;
+        margin-bottom: 15px;
+      "
+    >
+      ⚠️ Escribe a este correo si deseas seguir usando la app:
+      <strong>pickerup05@gmail.com</strong>
+    </div>
+
     <div id="app">
       <button onclick="logout()">Cerrar sesión</button>
       <h1>Registrar Pedidos del Dia</h1>
@@ -38,6 +55,7 @@
         >SKU'S: <input type="number" id="skus" class="input-pequeno" min="1"
       /></label>
       <button onclick="agregarPedido()">Agregar Pedido</button>
+
       <table>
         <thead>
           <tr class="mobile-row">
@@ -56,11 +74,9 @@
             </th>
           </tr>
         </thead>
-
         <tbody id="tabla-pedidos"></tbody>
       </table>
 
-      <!-- 👇 Botón para cargar más pedidos -->
       <button
         id="btn-cargar-mas"
         onclick="cargarMasPedidos()"
@@ -73,7 +89,6 @@
       <div class="total-descuento">
         Total menos 14.5%: $ <span id="total-con-descuento"></span>
       </div>
-
       <div class="cantidad-pedidos">
         Pedidos del mes: <span id="cantidad-pedidos"></span>
       </div>

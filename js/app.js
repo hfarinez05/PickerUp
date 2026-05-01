@@ -6,9 +6,10 @@ import {
   orderBy,
   limit,
   startAfter,
-  getDocs,
-  deleteDoc,
   doc,
+  getDocs,
+  getDoc,
+  deleteDoc,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   createUserWithEmailAndPassword,
@@ -22,7 +23,10 @@ function registrar() {
 
   createUserWithEmailAndPassword(auth, email, password)
     .then(() => alert("Usuario registrado"))
-    .catch((e) => alert(e.message));
+    .catch((e) => {
+      console.error("Error en registro:", e.code, e.message);
+      alert(e.message);
+    });
 }
 
 function login() {
@@ -234,20 +238,34 @@ function mostrarFeedback(skus) {
   setTimeout(() => feedback.classList.remove("mostrar"), 2000);
 }
 
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
   const app = document.getElementById("app");
   const authDiv = document.getElementById("auth");
   const loading = document.getElementById("loading");
+  const banner = document.getElementById("banner-alert");
 
   loading.style.display = "none";
 
   if (user) {
+    const ref = doc(db, "usuarios", user.uid);
+    const snap = await getDoc(ref);
+
+    if (!snap.exists() || snap.data().activo !== true) {
+      banner.style.display = "block";
+      app.style.display = "none";
+      authDiv.style.display = "block";
+      await auth.signOut();
+      return;
+    }
+
+    banner.style.display = "none";
     authDiv.style.display = "none";
     app.style.display = "block";
-    cargarPedidosIniciales(); // 👈 ahora carga solo 20
+    cargarPedidosIniciales();
   } else {
     authDiv.style.display = "block";
     app.style.display = "none";
+    banner.style.display = "block";
   }
 });
 
