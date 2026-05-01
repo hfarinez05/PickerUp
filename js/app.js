@@ -29,6 +29,7 @@ function registrar() {
       // 👇 Inicializa documento en Firestore con activo:false
       await setDoc(doc(db, "usuarios", user.uid), {
         activo: false,
+        email: user.email.toLowerCase().trim(),
       });
 
       alert("Usuario registrado. Debe ser habilitado por el administrador.");
