@@ -8,9 +8,11 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 import { db } from "./firebase.js";
+console.log("🔥 ADMIN JS CARGADO");
 
 // Función interna para buscar por correo
 async function buscarUsuarioPorCorreo(correo) {
+  console.log("🔎 Buscando:", correo);
   const q = query(
     collection(db, "usuarios"),
     where("email", "==", correo.toLowerCase().trim()),
