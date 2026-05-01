@@ -48,7 +48,8 @@ function login() {
     .catch((e) => alert(e.message));
 }
 
-let pedidos = [];
+// -------------------- VARIABLES GLOBALES --------------------
+let pedidos = []; // 👈 se declara UNA sola vez aquí
 let ultimoDoc = null; // 👈 para paginación
 
 function obtenerPiqueoUnitario(skus) {
@@ -71,18 +72,39 @@ async function agregarPedido() {
     return;
   }
 
-  const fecha = document.getElementById("Fecha").value;
-  const skus = parseInt(document.getElementById("skus").value);
+  const fechaInput = document.getElementById("Fecha").value; // ej: "2026-04-30"
+  console.log("Valor crudo del input Fecha:", fechaInput);
 
-  if (!fecha || isNaN(skus) || skus < 1) {
+  const skus = parseInt(document.getElementById("skus").value);
+  if (!fechaInput || isNaN(skus) || skus < 1) {
     alert("Datos inválidos");
     return;
   }
+
+  const [anio, mes, dia] = fechaInput.split("-");
+  const fecha = new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia));
+
+  if (isNaN(fecha.getTime())) {
+    alert("La fecha ingresada no es válida");
+    return;
+  }
+
+  const ahora = new Date();
+  fecha.setHours(ahora.getHours(), ahora.getMinutes(), ahora.getSeconds());
 
   const piqueoUnitario = obtenerPiqueoUnitario(skus);
   const piqueoTotal = piqueoUnitario * skus;
   const base = calcularBase(skus);
   const total = piqueoTotal + base;
+
+  console.log("Pedido a guardar:", {
+    fecha,
+    skus,
+    piqueoUnitario,
+    piqueoTotal,
+    base,
+    total,
+  });
 
   await addDoc(collection(db, "usuarios", user.uid, "pedidos"), {
     fecha,
@@ -94,7 +116,7 @@ async function agregarPedido() {
   });
 
   mostrarFeedback(skus);
-  cargarPedidosIniciales(); // 👈 recarga solo primeros 20
+  cargarPedidosIniciales();
   document.getElementById("skus").value = "";
 }
 
@@ -110,16 +132,25 @@ async function cargarPedidosIniciales() {
   );
 
   const snapshot = await getDocs(q);
-  pedidos = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  pedidos = [];
+
+  snapshot.forEach((docu) => {
+    const data = docu.data();
+    const pedido = { id: docu.id, ...data };
+    if (pedido.fecha && typeof pedido.fecha.toDate === "function") {
+      pedido.fechaObj = pedido.fecha.toDate();
+    }
+    pedidos.push(pedido);
+  });
+
+  if (!snapshot.empty) {
+    ultimoDoc = snapshot.docs[snapshot.docs.length - 1];
+  }
+
   actualizarTabla();
 
-  ultimoDoc = snapshot.docs[snapshot.docs.length - 1];
-
-  if (snapshot.docs.length === 20) {
-    document.getElementById("btn-cargar-mas").style.display = "block";
-  } else {
-    document.getElementById("btn-cargar-mas").style.display = "none";
-  }
+  const btn = document.getElementById("btn-cargar-mas");
+  btn.style.display = snapshot.size === 20 ? "block" : "none";
 }
 
 // ✅ Cargar más pedidos (otros 20)
@@ -135,31 +166,46 @@ async function cargarMasPedidos() {
   );
 
   const snapshot = await getDocs(q);
-  const nuevosPedidos = snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
-  pedidos = [...pedidos, ...nuevosPedidos];
+
+  snapshot.forEach((docu) => {
+    const data = docu.data();
+    const pedido = { id: docu.id, ...data };
+    if (pedido.fecha && typeof pedido.fecha.toDate === "function") {
+      pedido.fechaObj = pedido.fecha.toDate();
+    }
+    pedidos.push(pedido);
+  });
+
+  if (!snapshot.empty) {
+    ultimoDoc = snapshot.docs[snapshot.docs.length - 1];
+  }
+
   actualizarTabla();
 
-  if (snapshot.docs.length > 0) {
-    ultimoDoc = snapshot.docs[snapshot.docs.length - 1];
-  } else {
-    document.getElementById("btn-cargar-mas").style.display = "none";
+  const btn = document.getElementById("btn-cargar-mas");
+  if (snapshot.size < 20) {
+    btn.style.display = "none";
   }
 }
 
 function actualizarTabla() {
   const tabla = document.getElementById("tabla-pedidos");
   tabla.innerHTML = "";
-  pedidos.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
   const pedidosPorFecha = {};
   pedidos.forEach((pedido) => {
-    if (!pedidosPorFecha[pedido.fecha]) {
-      pedidosPorFecha[pedido.fecha] = [];
+    let fechaObj;
+    if (pedido.fecha && typeof pedido.fecha.toDate === "function") {
+      fechaObj = pedido.fecha.toDate(); // Timestamp
+    } else {
+      fechaObj = new Date(pedido.fecha); // Date
     }
-    pedidosPorFecha[pedido.fecha].push(pedido);
+    const fechaStr = fechaObj.toLocaleDateString("es-CL"); // 👈 solo fecha
+
+    if (!pedidosPorFecha[fechaStr]) {
+      pedidosPorFecha[fechaStr] = [];
+    }
+    pedidosPorFecha[fechaStr].push({ ...pedido, fechaObj });
   });
 
   const fechasOrdenadas = Object.keys(pedidosPorFecha);
@@ -175,7 +221,7 @@ function actualizarTabla() {
     grupo.forEach((p) => {
       const fila = document.createElement("tr");
       fila.innerHTML = `
-        <td>${p.fecha}</td>
+        <td>${p.fechaObj.toLocaleDateString("es-CL")}</td>
         <td>${p.skus}</td>
         <td>${p.piqueoTotal}<br><small>(${p.piqueoUnitario}x${p.skus})</small></td>
         <td>${p.base}</td>
@@ -207,8 +253,19 @@ function actualizarTabla() {
 async function eliminarPedido(id) {
   const user = auth.currentUser;
   if (!user) return;
-  await deleteDoc(doc(db, "usuarios", user.uid, "pedidos", id));
-  cargarPedidosIniciales();
+
+  try {
+    await deleteDoc(doc(db, "usuarios", user.uid, "pedidos", id));
+
+    // 👇 en vez de recargar todo, actualizamos el array en memoria
+    pedidos = pedidos.filter((p) => p.id !== id);
+    actualizarTabla();
+
+    alert("Pedido eliminado correctamente");
+  } catch (error) {
+    console.error("Error al eliminar pedido:", error);
+    alert("No se pudo eliminar el pedido");
+  }
 }
 
 async function eliminarTodosLosPedidos() {
@@ -234,8 +291,12 @@ async function eliminarTodosLosPedidos() {
   );
 
   await Promise.all(eliminaciones);
+
+  // 👇 vaciamos el array en memoria y refrescamos tabla
+  pedidos = [];
+  actualizarTabla();
+
   alert("Todos los pedidos eliminados");
-  cargarPedidosIniciales();
 }
 
 function mostrarFeedback(skus) {
