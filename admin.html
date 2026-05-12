@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <title>Panel Admin</title>
     <link rel="stylesheet" href="css/admin.css" />
-    <!-- 👈 enlace al CSS -->
   </head>
   <body>
     <div class="container">
@@ -18,6 +17,13 @@
       <input type="text" id="uid" placeholder="Ingresa UID del usuario" />
       <button onclick="activarUsuario()">Activar</button>
       <button onclick="desactivarUsuario()">Desactivar</button>
+
+      <hr />
+
+      <button onclick="buscarActivos()">Ver Activos</button>
+      <button onclick="buscarInactivos()">Ver Inactivos</button>
+
+      <div id="resultado"></div>
     </div>
 
     <script type="module" src="./js/admin.js"></script>
