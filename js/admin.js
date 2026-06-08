@@ -9,9 +9,7 @@ import {
 
 import { db } from "./firebase.js";
 
-// ------------------------
-// Buscar por correo
-// ------------------------
+// 🔎 Buscar usuario por correo
 async function buscarUsuarioPorCorreo(correo) {
   const q = query(
     collection(db, "usuarios"),
@@ -20,128 +18,125 @@ async function buscarUsuarioPorCorreo(correo) {
   const snap = await getDocs(q);
 
   if (snap.empty) {
-    alert("No se encontró usuario con ese correo");
+    document.getElementById("resultado").innerText =
+      "No se encontró usuario con ese correo.";
     return;
   }
 
+  let resultado = "<h4>Usuario encontrado:</h4><ul>";
   snap.forEach((docu) => {
-    const uid = docu.id;
-    alert(`UID encontrado: ${uid}`);
-    document.getElementById("uid").value = uid;
+    const data = docu.data();
+    resultado += `<li>${data.email} → activo=${data.activo}</li>`;
   });
+  resultado += "</ul>";
+
+  document.getElementById("resultado").innerHTML = resultado;
 }
 
-// ------------------------
-// Cambiar estado
-// ------------------------
-async function cambiarEstadoUsuario(uid, nuevoEstado) {
-  const ref = doc(db, "usuarios", uid);
-  await updateDoc(ref, { activo: nuevoEstado });
-  alert(`Usuario ${uid} actualizado a activo=${nuevoEstado}`);
-}
-
-// ------------------------
-// Buscar usuarios activos
-// ------------------------
-async function buscarUsuariosActivos() {
-  const q = query(collection(db, "usuarios"), where("activo", "==", true));
+// 🔄 Actualizar estado (activo/inactivo) por correo
+async function actualizarEstadoPorCorreo(correo, nuevoEstado) {
+  const q = query(
+    collection(db, "usuarios"),
+    where("email", "==", correo.toLowerCase().trim()),
+  );
   const snap = await getDocs(q);
 
   if (snap.empty) {
-    alert("No hay usuarios activos");
+    document.getElementById("resultado").innerText =
+      "No se encontró usuario con ese correo.";
     return;
   }
 
-  const lista = snap.docs.map((docu) => ({ id: docu.id, ...docu.data() }));
-  renderListaUsuarios(lista, "Usuarios activos");
-}
-
-// ------------------------
-// Buscar usuarios inactivos
-// ------------------------
-async function buscarUsuariosInactivos() {
-  const q = query(collection(db, "usuarios"), where("activo", "==", false));
-  const snap = await getDocs(q);
-
-  if (snap.empty) {
-    alert("No hay usuarios inactivos");
-    return;
-  }
-
-  const lista = snap.docs.map((docu) => ({ id: docu.id, ...docu.data() }));
-  renderListaUsuarios(lista, "Usuarios inactivos");
-}
-
-// ------------------------
-// Renderizar lista en tabla
-// ------------------------
-function renderListaUsuarios(lista, titulo) {
-  const contenedor = document.getElementById("resultado");
-  contenedor.innerHTML = `<h3>${titulo}</h3>`;
-
-  const tabla = document.createElement("table");
-  tabla.border = "1";
-  tabla.style.width = "100%";
-  tabla.innerHTML = `
-    <tr>
-      <th>Correo</th>
-      <th>UID</th>
-      <th>Activo</th>
-      <th>Acciones</th>
-    </tr>
-  `;
-
-  lista.forEach((u) => {
-    const fila = document.createElement("tr");
-    fila.innerHTML = `
-      <td>${u.email}</td>
-      <td>${u.id}</td>
-      <td>${u.activo ? "Sí" : "No"}</td>
-      <td>
-        <button onclick="activarUsuarioPorId('${u.id}')">Activar</button>
-        <button onclick="desactivarUsuarioPorId('${u.id}')">Desactivar</button>
-      </td>
-    `;
-    tabla.appendChild(fila);
+  snap.forEach(async (docu) => {
+    const ref = doc(db, "usuarios", docu.id);
+    await updateDoc(ref, { activo: nuevoEstado });
+    document.getElementById("resultado").innerText =
+      `Usuario ${correo} actualizado a activo=${nuevoEstado}`;
   });
-
-  contenedor.appendChild(tabla);
 }
 
-// ------------------------
-// Exponer funciones al HTML
-// ------------------------
+// 👉 Funciones expuestas al HTML
 window.buscarPorCorreo = async () => {
   const correo = document.getElementById("correo").value;
   if (!correo) return alert("Debes ingresar un correo");
-  await buscarUsuarioPorCorreo(correo);
+
+  const q = query(collection(db, "usuarios"), where("email", "==", correo));
+  const snap = await getDocs(q);
+
+  if (snap.empty) {
+    document.getElementById("resultado").innerText =
+      "No se encontró usuario con ese correo.";
+    return;
+  }
+
+  let resultado = "<h4>Usuarios encontrados:</h4><ul>";
+  snap.forEach((docu) => {
+    const data = docu.data();
+    const estadoClase = data.activo ? "activo" : "inactivo";
+    resultado += `
+      <li class="${estadoClase}">
+        <span>${data.email} → activo=${data.activo}</span>
+        <div class="acciones">
+          <button class="btn-activar" onclick="activarPorId('${docu.id}')">Activar</button>
+          <button class="btn-desactivar" onclick="desactivarPorId('${docu.id}')">Desactivar</button>
+        </div>
+      </li>`;
+  });
+  resultado += "</ul>";
+
+  document.getElementById("resultado").innerHTML = resultado;
+};
+
+// Funciones para activar/desactivar por ID único
+window.activarPorId = async (id) => {
+  const ref = doc(db, "usuarios", id);
+  await updateDoc(ref, { activo: true });
+  alert(`Usuario ${id} activado`);
+};
+
+window.desactivarPorId = async (id) => {
+  const ref = doc(db, "usuarios", id);
+  await updateDoc(ref, { activo: false });
+  alert(`Usuario ${id} desactivado`);
 };
 
 window.activarUsuario = async () => {
-  const uid = document.getElementById("uid").value;
-  if (!uid) return alert("Debes ingresar un UID");
-  await cambiarEstadoUsuario(uid, true);
+  const correo = document.getElementById("correo").value;
+  if (!correo) return alert("Debes ingresar un correo");
+  await actualizarEstadoPorCorreo(correo, true);
 };
 
 window.desactivarUsuario = async () => {
-  const uid = document.getElementById("uid").value;
-  if (!uid) return alert("Debes ingresar un UID");
-  await cambiarEstadoUsuario(uid, false);
+  const correo = document.getElementById("correo").value;
+  if (!correo) return alert("Debes ingresar un correo");
+  await actualizarEstadoPorCorreo(correo, false);
 };
 
+// 🔎 Ver usuarios activos
+// 🔎 Ver usuarios activos
 window.buscarActivos = async () => {
-  await buscarUsuariosActivos();
+  const q = query(collection(db, "usuarios"), where("activo", "==", true));
+  const snap = await getDocs(q);
+
+  let resultado = "<h4>Usuarios Activos:</h4><ul>";
+  snap.forEach((docu) => {
+    resultado += `<li class="activo">${docu.data().email}</li>`;
+  });
+  resultado += "</ul>";
+
+  document.getElementById("resultado").innerHTML = resultado;
 };
 
+// 🔎 Ver usuarios inactivos
 window.buscarInactivos = async () => {
-  await buscarUsuariosInactivos();
-};
+  const q = query(collection(db, "usuarios"), where("activo", "==", false));
+  const snap = await getDocs(q);
 
-// Acciones directas desde la tabla
-window.activarUsuarioPorId = async (uid) => {
-  await cambiarEstadoUsuario(uid, true);
-};
+  let resultado = "<h4>Usuarios Inactivos:</h4><ul>";
+  snap.forEach((docu) => {
+    resultado += `<li class="inactivo">${docu.data().email}</li>`;
+  });
+  resultado += "</ul>";
 
-window.desactivarUsuarioPorId = async (uid) => {
-  await cambiarEstadoUsuario(uid, false);
+  document.getElementById("resultado").innerHTML = resultado;
 };
