@@ -157,7 +157,7 @@ async function agregarPedido() {
   });
 
   mostrarFeedback(skus);
-  cargarPedidosIniciales();
+  await cargarPedidosIniciales();
   document.getElementById("skus").value = "";
 }
 
