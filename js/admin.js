@@ -55,6 +55,12 @@ async function actualizarEstadoPorCorreo(correo, nuevoEstado) {
   });
 }
 
+// 💰 Marcar/desmarcar pago por ID (solo identifica, no toca "activo")
+window.marcarPago = async (id, pago) => {
+  const ref = doc(db, "usuarios", id);
+  await updateDoc(ref, { pago });
+};
+
 // 👉 Funciones expuestas al HTML
 window.buscarPorCorreo = async () => {
   const correo = document.getElementById("correo").value;
@@ -76,6 +82,14 @@ window.buscarPorCorreo = async () => {
     resultado += `
       <li class="${estadoClase}">
         <span>${data.email} → activo=${data.activo}</span>
+        <label style="margin-left:10px;">
+          <input
+            type="checkbox"
+            ${data.pago ? "checked" : ""}
+            onchange="marcarPago('${docu.id}', this.checked)"
+          />
+          Pagó
+        </label>
         <div class="acciones">
           <button class="btn-activar" onclick="activarPorId('${docu.id}')">Activar</button>
           <button class="btn-desactivar" onclick="desactivarPorId('${docu.id}')">Desactivar</button>
@@ -113,14 +127,25 @@ window.desactivarUsuario = async () => {
 };
 
 // 🔎 Ver usuarios activos
-// 🔎 Ver usuarios activos
 window.buscarActivos = async () => {
   const q = query(collection(db, "usuarios"), where("activo", "==", true));
   const snap = await getDocs(q);
 
   let resultado = "<h4>Usuarios Activos:</h4><ul>";
   snap.forEach((docu) => {
-    resultado += `<li class="activo">${docu.data().email}</li>`;
+    const data = docu.data();
+    resultado += `
+      <li class="activo">
+        <span>${data.email}</span>
+        <label>
+          <input
+            type="checkbox"
+            ${data.pago ? "checked" : ""}
+            onchange="marcarPago('${docu.id}', this.checked)"
+          />
+          Pagó
+        </label>
+      </li>`;
   });
   resultado += "</ul>";
 
@@ -134,7 +159,19 @@ window.buscarInactivos = async () => {
 
   let resultado = "<h4>Usuarios Inactivos:</h4><ul>";
   snap.forEach((docu) => {
-    resultado += `<li class="inactivo">${docu.data().email}</li>`;
+    const data = docu.data();
+    resultado += `
+      <li class="inactivo">
+        <span>${data.email}</span>
+        <label>
+          <input
+            type="checkbox"
+            ${data.pago ? "checked" : ""}
+            onchange="marcarPago('${docu.id}', this.checked)"
+          />
+          Pagó
+        </label>
+      </li>`;
   });
   resultado += "</ul>";
 

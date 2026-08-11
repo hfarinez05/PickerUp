@@ -149,16 +149,3 @@ button:nth-of-type(3) {
   border-color: #0d6efd;
   transform: translateX(4px);
 }
-
-/* Íconos para estado */
-#resultado li.activo::before {
-  content: "✅ ";
-  color: #28a745;
-  font-size: 18px;
-}
-
-#resultado li.inactivo::before {
-  content: "❌ ";
-  color: #dc3545;
-  font-size: 18px;
-}
