@@ -3,14 +3,14 @@ import {
   collection,
   addDoc,
   query,
+  where,
   orderBy,
-  limit,
-  startAfter,
-  doc,
   getDocs,
   getDoc,
+  doc,
   deleteDoc,
   setDoc,
+  writeBatch,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   createUserWithEmailAndPassword,
@@ -18,389 +18,348 @@ import {
   onAuthStateChanged,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-function registrar() {
-  console.log("👉 INICIANDO REGISTRO");
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, "0");
+const clp = (n) => "$" + Math.round(n).toLocaleString("es-CL");
+const hoyISO = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+const claveDia = (f) => {
+  const d = f?.toDate ? f.toDate() : new Date(f);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+const fmtDia = (k) => {
+  const [a, m, d] = k.split("-");
+  return `${d}/${m}/${a}`;
+};
 
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
+let pedidos = [];
+let registrando = false;
+let avisoT;
 
-  console.log("📧 EMAIL:", email);
-  console.log("🔑 PASSWORD LENGTH:", password?.length);
-
-  createUserWithEmailAndPassword(auth, email, password)
-    .then(async (userCredential) => {
-      console.log("✔ AUTH OK");
-
-      const user = userCredential.user;
-
-      console.log("🧾 USER CREADO:");
-      console.log(user);
-
-      console.log("🆔 UID:", user.uid);
-      console.log("📧 USER EMAIL:", user.email);
-
-      try {
-        console.log("👉 ANTES DE FIRESTORE (setDoc)");
-
-        const data = {
-          activo: false,
-          email: user.email.toLowerCase().trim(),
-        };
-
-        console.log("📦 DATA A GUARDAR:", data);
-        console.log("🔥 EJECUTANDO setDoc...");
-
-        await setDoc(doc(db, "usuarios", user.uid), data);
-
-        console.log("✔ FIRESTORE OK");
-        console.log("🎉 USUARIO COMPLETAMENTE REGISTRADO");
-
-        alert(
-          "Usuario registrado con éxito. Debe ser habilitado por el administrador.",
-        );
-      } catch (error) {
-        console.error("❌ ERROR EN FIRESTORE");
-        console.error("CODE:", error.code);
-        console.error("MESSAGE:", error.message);
-        console.error("FULL ERROR:", error);
-
-        alert("Usuario creado, pero hubo un error guardando datos.");
-      }
-
-      console.log("👉 FIN BLOQUE AUTH SUCCESS");
-    })
-    .catch((e) => {
-      console.error("❌ ERROR EN AUTH");
-      console.error("CODE:", e.code);
-      console.error("MESSAGE:", e.message);
-
-      alert(e.message);
-    });
-
-  console.log("👉 FUNCIÓN REGISTRAR EJECUTADA (FIN SCOPE)");
+function aviso(texto, ms = 3500) {
+  const el = $("aviso");
+  el.textContent = texto;
+  clearTimeout(avisoT);
+  avisoT = setTimeout(() => (el.textContent = ""), ms);
 }
 
-function login() {
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
-
-  signInWithEmailAndPassword(auth, email, password)
-    .then(() => alert("Bienvenido"))
-    .catch((e) => alert(e.message));
+// Doble toque para confirmar (sin cuadros del navegador)
+function dobleToque(btn, textoConfirmar, textoNormal) {
+  if (btn.classList.contains("sure")) {
+    btn.classList.remove("sure");
+    btn.textContent = textoNormal;
+    return true;
+  }
+  btn.classList.add("sure");
+  btn.textContent = textoConfirmar;
+  setTimeout(() => {
+    btn.classList.remove("sure");
+    btn.textContent = textoNormal;
+  }, 3000);
+  return false;
 }
 
-// -------------------- VARIABLES GLOBALES --------------------
-let pedidos = []; // 👈 se declara UNA sola vez aquí
-let ultimoDoc = null; // 👈 para paginación
-
+// -------------------- REGLAS DE CÁLCULO --------------------
 function obtenerPiqueoUnitario(skus) {
-  if (skus >= 1 && skus <= 10) return 120;
-  else if (skus >= 11 && skus <= 20) return 70;
-  else if (skus >= 21 && skus <= 30) return 60;
-  else if (skus >= 31 && skus <= 40) return 55;
-  else if (skus >= 41 && skus <= 50) return 50;
-  else return 40;
+  if (skus <= 10) return 120;
+  if (skus <= 20) return 70;
+  if (skus <= 30) return 60;
+  if (skus <= 40) return 55;
+  if (skus <= 50) return 50;
+  return 40;
+}
+const calcularBase = (skus) => (skus <= 50 ? 1000 : 1200);
+
+// -------------------- AUTENTICACIÓN --------------------
+const ERRORES_AUTH = {
+  "auth/email-already-in-use": "Este correo ya está registrado.",
+  "auth/invalid-email": "Correo inválido.",
+  "auth/weak-password": "La contraseña debe tener al menos 6 caracteres.",
+  "auth/too-many-requests": "Demasiados intentos. Intenta más tarde.",
+  "auth/network-request-failed": "Error de conexión. Revisa tu internet.",
+  "auth/invalid-credential": "Correo o contraseña incorrectos.",
+  "auth/invalid-login-credentials": "Correo o contraseña incorrectos.",
+  "auth/user-not-found": "Correo o contraseña incorrectos.",
+  "auth/wrong-password": "Correo o contraseña incorrectos.",
+};
+
+async function login(e) {
+  e.preventDefault();
+  const email = $("email").value.toLowerCase().trim();
+  try {
+    await signInWithEmailAndPassword(auth, email, $("password").value);
+  } catch (err) {
+    console.error("Error en login:", err.code);
+    aviso(ERRORES_AUTH[err.code] ?? "Error al iniciar sesión.");
+  }
 }
 
-function calcularBase(skus) {
-  return skus <= 50 ? 1000 : 1200;
+async function registrar() {
+  const email = $("email").value.toLowerCase().trim();
+  const password = $("password").value;
+  if (!email || !password) {
+    aviso("Escribe tu correo y una contraseña.");
+    return;
+  }
+
+  registrando = true; // evita que onAuthStateChanged lea antes de crear el documento
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    try {
+      await setDoc(doc(db, "usuarios", cred.user.uid), {
+        email,
+        activo: false,
+        admin: false,
+      });
+    } catch (err) {
+      console.error("Error guardando usuario:", err);
+      await cred.user.delete().catch(() => {}); // evita un usuario a medias
+      aviso("No se pudo completar el registro. Intenta nuevamente.");
+      return;
+    }
+    await auth.signOut();
+    $("password").value = "";
+    aviso("Registro exitoso. Debe ser habilitado por el administrador.", 8000);
+  } catch (err) {
+    console.error("Error en registro:", err.code);
+    aviso(ERRORES_AUTH[err.code] ?? "Error al registrar usuario.");
+  } finally {
+    registrando = false;
+    mostrarLogin();
+  }
 }
 
-async function agregarPedido() {
-  const user = auth.currentUser;
+function mostrarLogin() {
+  $("loading").hidden = true;
+  $("app").hidden = true;
+  $("auth").hidden = false;
+}
+
+onAuthStateChanged(auth, async (user) => {
+  if (registrando) return;
+
   if (!user) {
-    alert("Debes iniciar sesión");
+    mostrarLogin();
     return;
   }
 
-  const fechaInput = document.getElementById("Fecha").value; // ej: "2026-04-30"
-  console.log("Valor crudo del input Fecha:", fechaInput);
-
-  const skus = parseInt(document.getElementById("skus").value);
-  if (!fechaInput || isNaN(skus) || skus < 1) {
-    alert("Datos inválidos");
+  try {
+    const snap = await getDoc(doc(db, "usuarios", user.uid));
+    if (!snap.exists() || snap.data().activo !== true) {
+      mostrarLogin();
+      aviso("Tu cuenta aún no está habilitada por el administrador.", 8000);
+      await auth.signOut();
+      return;
+    }
+  } catch (err) {
+    console.error("Error leyendo usuario:", err);
+    mostrarLogin();
+    aviso("No se pudo verificar tu cuenta. Intenta nuevamente.");
+    await auth.signOut();
     return;
   }
 
-  const [anio, mes, dia] = fechaInput.split("-");
-  const fecha = new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia));
+  $("loading").hidden = true;
+  $("auth").hidden = true;
+  $("app").hidden = false;
+  $("usuario").textContent = user.email;
 
-  if (isNaN(fecha.getTime())) {
-    alert("La fecha ingresada no es válida");
+  try {
+    $("porcentaje").value =
+      localStorage.getItem(`porcentaje_${user.uid}`) ?? "";
+  } catch {
+    $("porcentaje").value = "";
+  }
+  $("fecha").value = hoyISO();
+  $("mes").value = hoyISO().slice(0, 7);
+  cargar();
+});
+
+// -------------------- PEDIDOS --------------------
+function consultaMes(uid, mes) {
+  const [a, m] = mes.split("-").map(Number);
+  return query(
+    collection(db, "usuarios", uid, "pedidos"),
+    where("fecha", ">=", new Date(a, m - 1, 1)),
+    where("fecha", "<", new Date(a, m, 1)),
+    orderBy("fecha", "desc"),
+  );
+}
+
+async function cargar() {
+  const user = auth.currentUser;
+  const mes = $("mes").value;
+  if (!user || !mes) return;
+  try {
+    const snap = await getDocs(consultaMes(user.uid, mes));
+    pedidos = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    pintar();
+  } catch (err) {
+    console.error("Error cargando pedidos:", err);
+    aviso("No se pudieron cargar los pedidos.");
+  }
+}
+
+function pintar() {
+  const pct = Number($("porcentaje").value) || 0;
+  const factor = pct / 100;
+
+  const orden = [];
+  const porDia = {};
+  pedidos.forEach((p) => {
+    const k = claveDia(p.fecha);
+    if (!porDia[k]) {
+      porDia[k] = [];
+      orden.push(k);
+    }
+    porDia[k].push(p);
+  });
+
+  const totalMes = pedidos.reduce((s, p) => s + (Number(p.total) || 0), 0);
+  $("tB").textContent = clp(totalMes);
+  $("tD").textContent = clp(totalMes * factor);
+  $("tN").textContent = clp(totalMes - totalMes * factor);
+  $("cant").textContent = pedidos.length;
+
+  $("dias").innerHTML = orden.length
+    ? orden
+        .map((k) => {
+          const grupo = porDia[k];
+          const sub = grupo.reduce((s, p) => s + (Number(p.total) || 0), 0);
+          return (
+            `<section class="card"><h2>${fmtDia(k)}</h2>` +
+            grupo
+              .map(
+                (p) =>
+                  `<div class="item"><div><strong>${p.skus} SKUs</strong>` +
+                  `<small>${p.piqueoUnitario} × ${p.skus} = ${clp(p.piqueoTotal)} · base ${clp(p.base)}</small></div>` +
+                  `<div class="monto">${clp(p.total)}</div>` +
+                  `<button type="button" class="del" data-id="${p.id}" aria-label="Eliminar pedido">✕</button></div>`,
+              )
+              .join("") +
+            `<div class="dia"><div><span>Subtotal</span>${clp(sub)}</div>` +
+            `<div><span>Descuento (${pct}%)</span>${clp(sub * factor)}</div>` +
+            `<div><span>Total</span><strong>${clp(sub - sub * factor)}</strong></div></div></section>`
+          );
+        })
+        .join("")
+    : `<section class="card"><p class="vacio">Aún no hay pedidos este mes. Agrega el primero arriba.</p></section>`;
+}
+
+async function agregarPedido(e) {
+  e.preventDefault();
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const skus = parseInt($("skus").value, 10);
+  const fechaInput = $("fecha").value;
+  if (!fechaInput || !(skus >= 1)) {
+    aviso("Ingresa una fecha y una cantidad de SKUs de 1 o más.");
     return;
   }
 
+  const [a, m, d] = fechaInput.split("-").map(Number);
   const ahora = new Date();
-  fecha.setHours(ahora.getHours(), ahora.getMinutes(), ahora.getSeconds());
+  const fecha = new Date(
+    a,
+    m - 1,
+    d,
+    ahora.getHours(),
+    ahora.getMinutes(),
+    ahora.getSeconds(),
+  );
 
   const piqueoUnitario = obtenerPiqueoUnitario(skus);
   const piqueoTotal = piqueoUnitario * skus;
   const base = calcularBase(skus);
-  const total = piqueoTotal + base;
 
-  console.log("Pedido a guardar:", {
-    fecha,
-    skus,
-    piqueoUnitario,
-    piqueoTotal,
-    base,
-    total,
-  });
-
-  await addDoc(collection(db, "usuarios", user.uid, "pedidos"), {
-    fecha,
-    skus,
-    piqueoUnitario,
-    piqueoTotal,
-    base,
-    total,
-  });
-
-  mostrarFeedback(skus);
-  await cargarPedidosIniciales();
-  document.getElementById("skus").value = "";
-}
-
-// ✅ Cargar primeros 20 pedidos
-async function cargarPedidosIniciales() {
-  const user = auth.currentUser;
-  if (!user) return;
-
-  const q = query(
-    collection(db, "usuarios", user.uid, "pedidos"),
-    orderBy("fecha", "desc"),
-    limit(20),
-  );
-
-  const snapshot = await getDocs(q);
-  pedidos = [];
-
-  snapshot.forEach((docu) => {
-    const data = docu.data();
-    const pedido = { id: docu.id, ...data };
-    if (pedido.fecha && typeof pedido.fecha.toDate === "function") {
-      pedido.fechaObj = pedido.fecha.toDate();
-    }
-    pedidos.push(pedido);
-  });
-
-  if (!snapshot.empty) {
-    ultimoDoc = snapshot.docs[snapshot.docs.length - 1];
-  }
-
-  actualizarTabla();
-
-  const btn = document.getElementById("btn-cargar-mas");
-  btn.style.display = snapshot.size === 20 ? "block" : "none";
-}
-
-// ✅ Cargar más pedidos (otros 20)
-async function cargarMasPedidos() {
-  const user = auth.currentUser;
-  if (!user || !ultimoDoc) return;
-
-  const q = query(
-    collection(db, "usuarios", user.uid, "pedidos"),
-    orderBy("fecha", "desc"),
-    startAfter(ultimoDoc),
-    limit(20),
-  );
-
-  const snapshot = await getDocs(q);
-
-  snapshot.forEach((docu) => {
-    const data = docu.data();
-    const pedido = { id: docu.id, ...data };
-    if (pedido.fecha && typeof pedido.fecha.toDate === "function") {
-      pedido.fechaObj = pedido.fecha.toDate();
-    }
-    pedidos.push(pedido);
-  });
-
-  if (!snapshot.empty) {
-    ultimoDoc = snapshot.docs[snapshot.docs.length - 1];
-  }
-
-  actualizarTabla();
-
-  const btn = document.getElementById("btn-cargar-mas");
-  if (snapshot.size < 20) {
-    btn.style.display = "none";
-  }
-}
-
-function actualizarTabla() {
-  const tabla = document.getElementById("tabla-pedidos");
-  tabla.innerHTML = "";
-
-  const pedidosPorFecha = {};
-  pedidos.forEach((pedido) => {
-    let fechaObj;
-    if (pedido.fecha && typeof pedido.fecha.toDate === "function") {
-      fechaObj = pedido.fecha.toDate(); // Timestamp
-    } else {
-      fechaObj = new Date(pedido.fecha); // Date
-    }
-    const fechaStr = fechaObj.toLocaleDateString("es-CL"); // 👈 solo fecha
-
-    if (!pedidosPorFecha[fechaStr]) {
-      pedidosPorFecha[fechaStr] = [];
-    }
-    pedidosPorFecha[fechaStr].push({ ...pedido, fechaObj });
-  });
-
-  const fechasOrdenadas = Object.keys(pedidosPorFecha);
-  let totalGeneral = 0;
-
-  for (const fecha of fechasOrdenadas) {
-    const grupo = pedidosPorFecha[fecha];
-    const encabezado = document.createElement("tr");
-    encabezado.innerHTML = `<td colspan="6" style="background-color: #eee; font-weight: bold;">${fecha}</td>`;
-    tabla.appendChild(encabezado);
-
-    let subTotal = 0;
-    grupo.forEach((p) => {
-      const fila = document.createElement("tr");
-      fila.innerHTML = `
-        <td>${p.fechaObj.toLocaleDateString("es-CL")}</td>
-        <td>${p.skus}</td>
-        <td>${p.piqueoTotal}<br><small>(${p.piqueoUnitario}x${p.skus})</small></td>
-        <td>${p.base}</td>
-        <td>${p.total}</td>
-        <td><button class="eliminar" onclick="eliminarPedido('${p.id}')">X</button></td>`;
-      tabla.appendChild(fila);
-      subTotal += p.total;
+  const btn = $("agregar");
+  btn.disabled = true;
+  try {
+    await addDoc(collection(db, "usuarios", user.uid, "pedidos"), {
+      fecha,
+      skus,
+      piqueoUnitario,
+      piqueoTotal,
+      base,
+      total: piqueoTotal + base,
     });
-
-    const filaResumen = document.createElement("tr");
-    filaResumen.innerHTML = `
-      <td colspan="3" style="text-align:left; font-style: italic;">Pedidos del día: ${grupo.length}</td>
-      <td colspan="3" style="text-align:right;"><strong>Subtotal del día:</strong> $${subTotal}</td>`;
-    tabla.appendChild(filaResumen);
-
-    totalGeneral += subTotal;
+    $("skus").value = "";
+    $("mes").value = fechaInput.slice(0, 7);
+    await cargar();
+  } catch (err) {
+    console.error("Error guardando pedido:", err);
+    aviso("No se pudo guardar el pedido.");
+  } finally {
+    btn.disabled = false;
   }
-
-  document.getElementById("total-dia").textContent = totalGeneral;
-  const porcentaje = Number(document.getElementById("porcentaje").value) || 0;
-  document.getElementById("porcentaje-texto").textContent = porcentaje;
-  const descuento = totalGeneral * (porcentaje / 100);
-  const totalConDescuento = totalGeneral - descuento;
-  document.getElementById("total-con-descuento").textContent =
-    totalConDescuento.toFixed(2);
-
-  const cantidadPedidosEl = document.getElementById("cantidad-pedidos");
-  if (cantidadPedidosEl) cantidadPedidosEl.textContent = pedidos.length;
 }
 
-async function eliminarPedido(id) {
+async function eliminarPedido(btn) {
+  if (!dobleToque(btn, "¿Eliminar?", "✕")) return;
   const user = auth.currentUser;
   if (!user) return;
-
+  const id = btn.dataset.id;
   try {
     await deleteDoc(doc(db, "usuarios", user.uid, "pedidos", id));
-
-    // 👇 en vez de recargar todo, actualizamos el array en memoria
     pedidos = pedidos.filter((p) => p.id !== id);
-    actualizarTabla();
-
-    alert("Pedido eliminado correctamente");
-  } catch (error) {
-    console.error("Error al eliminar pedido:", error);
-    alert("No se pudo eliminar el pedido");
+    pintar();
+  } catch (err) {
+    console.error("Error eliminando pedido:", err);
+    aviso("No se pudo eliminar el pedido.");
   }
 }
 
-async function eliminarTodosLosPedidos() {
-  const confirmacion = confirm("¿Estás seguro de borrar todos los pedidos?");
-  if (!confirmacion) return;
-
+async function borrarMes() {
+  const mes = $("mes").value;
   const user = auth.currentUser;
-  if (!user) {
-    alert("No hay usuario logueado");
+  if (!user || !mes) return;
+  const [a, m] = mes.split("-");
+  if (!dobleToque($("borrarMes"), `¿Borrar todo ${m}/${a}?`, "Borrar mes"))
     return;
-  }
 
-  const q = query(collection(db, "usuarios", user.uid, "pedidos"));
-  const snapshot = await getDocs(q);
-
-  if (snapshot.empty) {
-    alert("No hay pedidos para eliminar");
-    return;
-  }
-
-  const eliminaciones = snapshot.docs.map((docu) =>
-    deleteDoc(doc(db, "usuarios", user.uid, "pedidos", docu.id)),
-  );
-
-  await Promise.all(eliminaciones);
-
-  // 👇 vaciamos el array en memoria y refrescamos tabla
-  pedidos = [];
-  actualizarTabla();
-
-  alert("Todos los pedidos eliminados");
-}
-
-function mostrarFeedback(skus) {
-  const feedback = document.getElementById("feedback");
-  if (skus <= 10) feedback.textContent = "😊";
-  else if (skus <= 25) feedback.textContent = "😐";
-  else feedback.textContent = "😟";
-
-  feedback.classList.add("mostrar");
-  setTimeout(() => feedback.classList.remove("mostrar"), 2000);
-}
-
-function inicializarPorcentaje(user) {
-  const input = document.getElementById("porcentaje");
-  input.value = localStorage.getItem(`porcentaje_${user.uid}`) ?? "";
-  input.oninput = () => {
-    localStorage.setItem(`porcentaje_${user.uid}`, input.value);
-    actualizarTabla();
-  };
-}
-
-onAuthStateChanged(auth, async (user) => {
-  const app = document.getElementById("app");
-  const authDiv = document.getElementById("auth");
-  const loading = document.getElementById("loading");
-  const banner = document.getElementById("banner-alert");
-
-  loading.style.display = "none";
-
-  if (user) {
-    const ref = doc(db, "usuarios", user.uid);
-    const snap = await getDoc(ref);
-
-    if (!snap.exists() || snap.data().activo !== true) {
-      banner.style.display = "block";
-      app.style.display = "none";
-      authDiv.style.display = "block";
-      await auth.signOut();
+  try {
+    const snap = await getDocs(consultaMes(user.uid, mes));
+    if (snap.empty) {
+      aviso("No hay pedidos en este mes.");
       return;
     }
-
-    banner.style.display = "none";
-    authDiv.style.display = "none";
-    app.style.display = "block";
-    inicializarPorcentaje(user);
-    cargarPedidosIniciales();
-  } else {
-    authDiv.style.display = "block";
-    app.style.display = "none";
-    banner.style.display = "block";
+    for (let i = 0; i < snap.docs.length; i += 400) {
+      const batch = writeBatch(db);
+      snap.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+    pedidos = [];
+    pintar();
+    aviso("Pedidos del mes eliminados.");
+  } catch (err) {
+    console.error("Error borrando el mes:", err);
+    aviso("No se pudieron eliminar los pedidos.");
   }
-});
-
-function logout() {
-  auth.signOut();
 }
 
-window.registrar = registrar;
-window.login = login;
-window.logout = logout;
-window.agregarPedido = agregarPedido;
-window.eliminarPedido = eliminarPedido;
-window.eliminarTodosLosPedidos = eliminarTodosLosPedidos;
-window.cargarMasPedidos = cargarMasPedidos;
+// -------------------- EVENTOS --------------------
+$("formLogin").addEventListener("submit", login);
+$("btnRegistrar").addEventListener("click", registrar);
+$("formPedido").addEventListener("submit", agregarPedido);
+$("btnLogout").addEventListener("click", () => auth.signOut());
+$("borrarMes").addEventListener("click", borrarMes);
+$("mes").addEventListener("change", () => $("mes").value && cargar());
+
+$("porcentaje").addEventListener("input", () => {
+  try {
+    const user = auth.currentUser;
+    if (user)
+      localStorage.setItem(`porcentaje_${user.uid}`, $("porcentaje").value);
+  } catch {
+    /* sin almacenamiento disponible */
+  }
+  pintar();
+});
+
+$("dias").addEventListener("click", (e) => {
+  const btn = e.target.closest(".del");
+  if (btn) eliminarPedido(btn);
+});
