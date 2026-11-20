@@ -282,7 +282,9 @@ function actualizarTabla() {
   }
 
   document.getElementById("total-dia").textContent = totalGeneral;
-  const descuento = totalGeneral * 0.145;
+  const porcentaje = Number(document.getElementById("porcentaje").value) || 0;
+  document.getElementById("porcentaje-texto").textContent = porcentaje;
+  const descuento = totalGeneral * (porcentaje / 100);
   const totalConDescuento = totalGeneral - descuento;
   document.getElementById("total-con-descuento").textContent =
     totalConDescuento.toFixed(2);
@@ -350,6 +352,15 @@ function mostrarFeedback(skus) {
   setTimeout(() => feedback.classList.remove("mostrar"), 2000);
 }
 
+function inicializarPorcentaje(user) {
+  const input = document.getElementById("porcentaje");
+  input.value = localStorage.getItem(`porcentaje_${user.uid}`) ?? "";
+  input.oninput = () => {
+    localStorage.setItem(`porcentaje_${user.uid}`, input.value);
+    actualizarTabla();
+  };
+}
+
 onAuthStateChanged(auth, async (user) => {
   const app = document.getElementById("app");
   const authDiv = document.getElementById("auth");
@@ -373,6 +384,7 @@ onAuthStateChanged(auth, async (user) => {
     banner.style.display = "none";
     authDiv.style.display = "none";
     app.style.display = "block";
+    inicializarPorcentaje(user);
     cargarPedidosIniciales();
   } else {
     authDiv.style.display = "block";
